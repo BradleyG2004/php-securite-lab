@@ -2,7 +2,7 @@
 // ============================================================
 // FAILLE CONFIG-01 : Affichage des erreurs activé en production
 // ============================================================
-ini_set('display_errors', 1);      // ❌ FAILLE: révèle les chemins, structure BDD
+ini_set('display_errors', 0);      // ❌ FAILLE: révèle les chemins, structure BDD
 error_reporting(E_ALL);
 
 // ============================================================

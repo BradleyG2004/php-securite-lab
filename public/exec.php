@@ -11,10 +11,15 @@ $output = '';
 $host   = '';
 
 if (isset($_GET['host'])) {
-    $host = $_GET['host'];  // ❌ FAILLE: non filtré, non échappé
+    $host = $_GET['host'];
 
-    // ❌ FAILLE CMD-01 : exécution de commande avec entrée utilisateur
-    exec("ping -c 1 " . $host, $output_lines);
+    // validation hostname ou IP
+    if (!filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) &&
+        !filter_var($host, FILTER_VALIDATE_IP)) {
+        die("Host invalide");
+    }
+
+    exec("ping -c 1 " . escapeshellarg($host), $output_lines);
     $output = implode("\n", $output_lines);
 }
 ?>
