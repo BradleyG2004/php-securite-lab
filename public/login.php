@@ -11,14 +11,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Les données $_POST sont concaténées sans protection
     // Test : username = ' OR '1'='1  / password = anything
     // ============================================================
-    $username = $_POST['username'];   // ❌ FAILLE: non filtré, non échappé
-    $password = $_POST['password'];   // ❌ FAILLE: non filtré
+    // $username = $_POST['username'];   // ❌ FAILLE: non filtré, non échappé
+    // $password = $_POST['password'];   // ❌ FAILLE: non filtré
 
-    $query = "SELECT * FROM users WHERE username = '$username' AND password = '$password'";
-    // ❌ FAILLE SQLi-01 : concaténation directe = injection SQL
+    // $query = "SELECT * FROM users WHERE username = '$username' AND password = '$password'";
+    // // ❌ FAILLE SQLi-01 : concaténation directe = injection SQL
 
-    $result = $pdo->query($query);
-    $user = $result->fetch(PDO::FETCH_ASSOC);
+    // $result = $pdo->query($query);
+    // $user = $result->fetch(PDO::FETCH_ASSOC);
+
+    // Récupération des données (sans modification)
+    $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
+
+    // Requête préparée
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = :username AND password = :password");
+
+    // Exécution avec paramètres liés
+    $stmt->execute([
+        ':username' => $username,
+        ':password' => $password
+    ]);
+
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user) {
         // ============================================================

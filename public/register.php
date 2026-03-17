@@ -7,25 +7,63 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pdo = getDB();
 
-    $username = $_POST['username'] ?? '';
-    $email    = $_POST['email']    ?? '';
+    $username = trim($_POST['username'] ?? '');
+    $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    // ============================================================
-    // FAILLE PASSWD-01 : Mot de passe stocké en CLAIR
-    // Doit utiliser password_hash($password, PASSWORD_ARGON2ID)
-    // ============================================================
-    $stmt = $pdo->prepare("INSERT INTO users (username, email, password) VALUES (?, ?, ?)");
-    $stmt->execute([$username, $email, $password]);  // ❌ FAILLE: mot de passe en clair
+    $errors = [];
 
-    // ============================================================
-    // FAILLE VALIDATION-01 : Aucune validation des entrées
-    // - Pas de vérification de la longueur du mot de passe
-    // - Pas de vérification du format de l'email
-    // - Pas de vérification que l'utilisateur existe déjà
-    // ============================================================
+    // =========================
+    // ✅ VALIDATION
+    // =========================
 
-    $success = "Compte créé ! <a href='login.php'>Se connecter</a>";
+    // Username
+    if (strlen($username) < 3 || strlen($username) > 50) {
+        $errors[] = "Nom d'utilisateur invalide (3-50 caractères).";
+    }
+
+    // Email
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Email invalide.";
+    }
+
+    // Mot de passe
+    if (strlen($password) < 8) {
+        $errors[] = "Mot de passe trop court (min 8 caractères).";
+    }
+
+    // Vérifier si utilisateur existe déjà
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email OR username = :username");
+    $stmt->execute([
+        ':email' => $email,
+        ':username' => $username
+    ]);
+
+    if ($stmt->fetch()) {
+        $errors[] = "Utilisateur déjà existant.";
+    }
+
+    // =========================
+    // ✅ SI PAS D'ERREUR
+    // =========================
+    if (empty($errors)) {
+
+        // 🔒 Hash du mot de passe (CRITIQUE)
+        $hashedPassword = password_hash($password, PASSWORD_ARGON2ID);
+
+        $stmt = $pdo->prepare("
+            INSERT INTO users (username, email, password) 
+            VALUES (:username, :email, :password)
+        ");
+
+        $stmt->execute([
+            ':username' => $username,
+            ':email' => $email,
+            ':password' => $hashedPassword
+        ]);
+
+        $success = "Compte créé ! <a href='login.php'>Se connecter</a>";
+    }
 }
 ?>
 <!DOCTYPE html>

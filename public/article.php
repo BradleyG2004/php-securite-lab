@@ -3,38 +3,52 @@ require_once 'config.php';
 
 $pdo = getDB();
 
-// ============================================================
-// FAILLE SQLi-02 : Injection SQL via paramètre GET
-// Test : /article.php?id=1 UNION SELECT 1,username,password,email,role,created_at FROM users--
-// ============================================================
-$id = $_GET['id'];  // ❌ FAILLE: non filtré, non casté en entier
+// Cast optionnel (bonne pratique en plus)
+$id = (int) ($_GET['id'] ?? 0);
 
-$query = "SELECT a.*, u.username FROM articles a LEFT JOIN users u ON a.author_id = u.id WHERE a.id = $id";
-// ❌ FAILLE SQLi-02 : concaténation directe
+// Requête préparée
+$stmt = $pdo->prepare("
+    SELECT a.*, u.username 
+    FROM articles a 
+    LEFT JOIN users u ON a.author_id = u.id 
+    WHERE a.id = :id
+");
 
-$article = $pdo->query($query)->fetch(PDO::FETCH_ASSOC);
+$stmt->execute([':id' => $id]);
+
+$article = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$article) {
     die("Article introuvable.");
 }
 
-// Récupération des commentaires
-$comments = $pdo->query("SELECT * FROM comments WHERE article_id = $id ORDER BY created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
+$stmt = $pdo->prepare("
+    SELECT * 
+    FROM comments 
+    WHERE article_id = :id 
+    ORDER BY created_at ASC
+");
 
-// Traitement d'un nouveau commentaire
+$stmt->execute([':id' => $id]);
+
+$comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $author  = $_POST['author']  ?? '';
     $content = $_POST['content'] ?? '';
 
-    // ============================================================
-    // FAILLE XSS-01 : Stored XSS
-    // Les commentaires sont enregistrés et réaffichés sans échappement
-    // Test : <script>alert('XSS stocké !')</script>
-    // ============================================================
-    $stmt = $pdo->prepare("INSERT INTO comments (article_id, author_name, content) VALUES (?, ?, ?)");
-    $stmt->execute([$id, $author, $content]);  // ❌ FAILLE: $content non assaini
+    $stmt = $pdo->prepare("
+        INSERT INTO comments (article_id, author_name, content) 
+        VALUES (:id, :author, :content)
+    ");
 
-    header("Location: article.php?id=$id");
+    $stmt->execute([
+        ':id' => $id,
+        ':author' => $author,
+        ':content' => $content
+    ]);
+
+    header("Location: article.php?id=" . urlencode($id));
     exit;
 }
 ?>
@@ -66,19 +80,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </nav>
 
 <div class="card">
-    <!-- ❌ FAILLE XSS-02 : affichage sans htmlspecialchars() -->
-    <h1><?= $article['title'] ?></h1>
-    <p><?= $article['content'] ?></p>
-    <small>Par <?= $article['username'] ?> – <?= $article['created_at'] ?></small>
+    <h1><?= htmlspecialchars($article['title'], ENT_QUOTES, 'UTF-8') ?></h1>
+    <p><?= htmlspecialchars($article['content'], ENT_QUOTES, 'UTF-8') ?></p>
+    <small>
+        Par <?= htmlspecialchars($article['username'], ENT_QUOTES, 'UTF-8') ?> – 
+        <?= htmlspecialchars($article['created_at'], ENT_QUOTES, 'UTF-8') ?>
+    </small>
 </div>
 
 <h2>Commentaires (<?= count($comments) ?>)</h2>
 
 <?php foreach ($comments as $comment): ?>
 <div class="comment">
-    <!-- ❌ FAILLE XSS-01 : commentaire affiché sans échappement → XSS stocké -->
-    <strong><?= $comment['author_name'] ?></strong>
-    <p><?= $comment['content'] ?></p>
+    <strong><?= htmlspecialchars($comment['author_name'], ENT_QUOTES, 'UTF-8') ?></strong>
+    <p><?= htmlspecialchars($comment['content'], ENT_QUOTES, 'UTF-8') ?></p>
 </div>
 <?php endforeach; ?>
 

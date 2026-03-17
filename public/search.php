@@ -5,18 +5,40 @@ $results = [];
 $query_str = '';
 
 if (isset($_GET['q'])) {
+    // $pdo = getDB();
+
+    // // ============================================================
+    // // FAILLE SQLi-03 : Injection SQL dans la recherche
+    // // Test : ' UNION SELECT 1,username,password,email,role,created_at FROM users--
+    // // ============================================================
+    // $query_str = $_GET['q'];  // ❌ FAILLE: non filtré
+
+    // $sql = "SELECT * FROM articles WHERE title LIKE '%$query_str%' OR content LIKE '%$query_str%'";
+    // // ❌ FAILLE SQLi-03
+
+    // $results = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     $pdo = getDB();
 
-    // ============================================================
-    // FAILLE SQLi-03 : Injection SQL dans la recherche
-    // Test : ' UNION SELECT 1,username,password,email,role,created_at FROM users--
-    // ============================================================
-    $query_str = $_GET['q'];  // ❌ FAILLE: non filtré
+    // Récupération de l'entrée
+    $query_str = $_GET['q'] ?? '';
 
-    $sql = "SELECT * FROM articles WHERE title LIKE '%$query_str%' OR content LIKE '%$query_str%'";
-    // ❌ FAILLE SQLi-03
+    // Préparation du pattern LIKE (on ajoute les % ici, pas dans la requête SQL)
+    $search = '%' . $query_str . '%';
 
-    $results = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    // Requête préparée
+    $stmt = $pdo->prepare("
+        SELECT * 
+        FROM articles 
+        WHERE title LIKE :search 
+        OR content LIKE :search
+    ");
+
+    // Exécution sécurisée
+    $stmt->execute([
+        ':search' => $search
+    ]);
+
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 <!DOCTYPE html>
@@ -44,22 +66,34 @@ if (isset($_GET['q'])) {
 <h1>🔍 Recherche</h1>
 
 <form method="GET">
-    <input type="text" name="q" value="<?= $_GET['q'] ?? '' ?>" placeholder="Rechercher...">
-    <!-- ❌ FAILLE XSS-03 : la valeur du champ est réaffichée sans htmlspecialchars() (Reflected XSS) -->
+    <input 
+        type="text" 
+        name="q" 
+        value="<?= htmlspecialchars($_GET['q'] ?? '', ENT_QUOTES, 'UTF-8') ?>" 
+        placeholder="Rechercher..."
+    >
     <button type="submit">Rechercher</button>
 </form>
 
 <?php if ($query_str !== ''): ?>
-    <!-- ❌ FAILLE XSS-03 : Reflected XSS sur le terme de recherche -->
-    <p>Résultats pour : <strong><?= $query_str ?></strong></p>
+    <p>
+        Résultats pour : 
+        <strong><?= htmlspecialchars($query_str, ENT_QUOTES, 'UTF-8') ?></strong>
+    </p>
 
     <?php if (empty($results)): ?>
         <p>Aucun résultat.</p>
     <?php else: ?>
         <?php foreach ($results as $r): ?>
         <div class="card">
-            <h3><a href="article.php?id=<?= $r['id'] ?>"><?= $r['title'] ?></a></h3>
-            <p><?= mb_substr($r['content'], 0, 200) ?>...</p>
+            <h3>
+                <a href="article.php?id=<?= urlencode($r['id']) ?>">
+                    <?= htmlspecialchars($r['title'], ENT_QUOTES, 'UTF-8') ?>
+                </a>
+            </h3>
+            <p>
+                <?= htmlspecialchars(mb_substr($r['content'], 0, 200), ENT_QUOTES, 'UTF-8') ?>...
+            </p>
         </div>
         <?php endforeach; ?>
     <?php endif; ?>
