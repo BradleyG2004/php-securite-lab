@@ -41,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // après l'authentification → session fixation possible
         // ============================================================
         // session_regenerate_id(true);  ← absent intentionnellement
+         
+    // ✅ UNE SEULE LIGNE MAGIQUE À AJOUTER
+    session_regenerate_id(true);
 
         $_SESSION['user_id']   = $user['id'];
         $_SESSION['username']  = $user['username'];

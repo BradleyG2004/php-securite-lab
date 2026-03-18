@@ -1,4 +1,5 @@
 <?php
+
 // ============================================================
 // FAILLE CONFIG-01 : Affichage des erreurs activé en production
 // ============================================================
@@ -34,4 +35,14 @@ function getDB(): PDO {
 // session.cookie_httponly = 1
 // session.cookie_secure   = 1
 // session.cookie_samesite = Strict
+
+// À placer dans votre config.php, AVANT session_start()
+session_set_cookie_params([
+    'lifetime' => 0,              // Expire à la fermeture du navigateur
+    'path' => '/',                // Valide sur tout le site
+    'secure' => true,             // ⚠️ HTTPS uniquement (false en dev local)
+    'httponly' => true,           // JavaScript ne peut PAS lire ce cookie
+    'samesite' => 'Strict'        // Bloque les requêtes cross-site
+]);
+
 session_start();
